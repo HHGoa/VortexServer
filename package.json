@@ -1,0 +1,19 @@
+{
+  "name": "vortexserver",
+  "version": "1.0.0",
+  "description": "VortexServer is a Node.js server for the Vortex Engine, which builds on-chain games. It provides APIs to generate and retrieve unique keys based on addresses and blockchain names. Using Express.js, it offers efficient, in-memory mapping storage for seamless game and blockchain integration.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "crypto": "^1.0.1",
+    "express": "^4.19.2",
+    "nodemon": "^3.1.4"
+  }
+}
