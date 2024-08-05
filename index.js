@@ -27,6 +27,10 @@ function generateUniqueKey(address, chainName) {
   return hash;
 }
 
+app.get('/', (req, res) => {
+    res.send('Server is working!');
+  });
+
 // API endpoint to generate a unique key and map it with the provided parameters
 app.post('/generate-key', (req, res) => {
   const { address, chainName } = req.body;
