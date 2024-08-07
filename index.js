@@ -1,21 +1,10 @@
 const express = require('express');
 const crypto = require('crypto');
-const cors = require("cors");
 const bodyParser = require('body-parser');
 const { AptosClient, AptosAccount, HexString } = require('aptos');
 
-
 const app = express();
 const port = 5000;
-
-const corsOptions = {
-  origin: ['', 'http://localhost:5173'],
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  credentials: true,
-  optionsSuccessStatus: 204,
-};
-
-app.use(cors(corsOptions));
 
 app.use(bodyParser.json());
 
@@ -24,15 +13,20 @@ const moduleAddress = "0xde5d94dac0db9e017d907b6e02a6d4274e0e2fbbe018e3a698d81e8
 
 // Function to generate a unique key
 function generateUniqueKey(address, chainName) {
+  // Concatenate the values
   const data = `${address}:${chainName}`;
+
+  // Generate a hash of the concatenated values
   const hash = crypto.createHash('sha256').update(data).digest('hex');
+
   return hash;
 }
 
 app.get('/', (req, res) => {
-  res.send('Server is working!');
-});
+    res.send('Server is working!');
+  });
 
+// API endpoint to generate a unique key and map it with the provided parameters
 app.post('/generate-key', (req, res) => {
   const { address, chainName } = req.body;
 
@@ -41,36 +35,50 @@ app.post('/generate-key', (req, res) => {
   }
 
   const uniqueKey = generateUniqueKey(address, chainName);
+
+  // Store the mapping
+//   console.log(uniqueKey);
   keyMap[uniqueKey] = { address, chainName };
+  
 
   return res.json({ uniqueKey });
 });
 
+// API endpoint to get the mapped details by providing the unique key
 app.get('/get-details/:uniqueKey', (req, res) => {
   const { uniqueKey } = req.params;
+    
   const mapping = keyMap[uniqueKey];
 
   if (!mapping) {
     return res.status(404).json({ error: 'Mapping not found for the provided unique key.' });
   }
 
+//   console.log(uniqueKey,mapping);
+  
+
   return res.json({ uniqueKey, mapping });
 });
 
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
+
+// Utility to convert private key to AptosAccount
 function getAptosAccount(privateKeyHex) {
   const privateKeyBytes = Buffer.from(privateKeyHex, 'hex');
   if (privateKeyBytes.length !== 32) {
     throw new Error('Private key must be 32 bytes long.');
   }
 
+  // Create AptosAccount directly
   return new AptosAccount(privateKeyBytes);
 }
 
+// Function to check if list exists
 async function listExists(account) {
   try {
     const resource = await client.getAccountResource(account.address(), `${moduleAddress}::vortexengine::EntityList`);
@@ -83,26 +91,31 @@ async function listExists(account) {
   }
 }
 
+// Function to create a list
 app.post('/api/create-list', async (req, res) => {
   const { privateKey } = req.body;
   console.log("Received private key:", privateKey);
 
   try {
+    // Create AptosAccount instance
     const account = getAptosAccount(privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey);
     console.log("Created AptosAccount instance:", account.address().hex());
 
+    // Check if list already exists
     const exists = await listExists(account);
     if (exists) {
       return res.status(400).json({ message: "List already exists for this wallet." });
     }
 
+    // Prepare payload
     const payload = {
-      function: `${moduleAddress}::vortexengine::create_list`,
-      type_arguments: [],
-      arguments: []
+      function: `${moduleAddress}::vortexengine::create_list`, // Ensure this function exists in the module
+      type_arguments: [], // No type arguments
+      arguments: [] // Arguments must match the smart contract's expected input
     };
     console.log("Payload:", payload);
 
+    // Submit transaction
     const txnRequest = await client.generateTransaction(account.address(), payload);
     const signedTxn = await client.signTransaction(account, txnRequest);
     const response = await client.submitTransaction(signedTxn);
@@ -116,42 +129,18 @@ app.post('/api/create-list', async (req, res) => {
   }
 });
 
-let ipfs;
 
-(async () => {
-  const { create } = await import('ipfs-http-client');
-  ipfs = create({ host: 'ipfs.infura.io', port: 5001, protocol: 'https' });
-})();
-
-async function storeData(data) {
-  try {
-    console.log(data);
-    
-    if (!data) {
-      throw new Error("Data to store is undefined or null");
-    }
-    const { path } = await ipfs.add(data);
-    console.log('Data stored successfully! IPFS Path:', path);
-    return path;
-  } catch (error) {
-    console.error('Error storing data to IPFS:', error);
-    throw error;
-  }
-}
 
 app.post('/api/create-entry', async (req, res) => {
   const { ipfscontent, timestamp, privateKey } = req.body;
 
   try {
     const account = getAptosAccount(privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey);
-    console.log(ipfscontent);
-    
-    const ipfsPath = await storeData(ipfscontent);
 
     const payload = {
       function: `${moduleAddress}::vortexengine::create_entry`,
       type_arguments: [],
-      arguments: [ipfsPath, timestamp],
+      arguments: [ipfscontent, timestamp],
     };
 
     const txnRequest = await client.generateTransaction(account.address(), payload);
@@ -165,6 +154,7 @@ app.post('/api/create-entry', async (req, res) => {
     res.status(500).json({ error: "Error creating entry", details: error.message });
   }
 });
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
